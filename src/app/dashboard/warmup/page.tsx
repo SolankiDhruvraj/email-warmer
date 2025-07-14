@@ -438,7 +438,7 @@ const Warmup: React.FC = () => {
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
                             <div className="space-y-4">
                                 <Link
-                                    href="/checkEmailReputation"
+                                    href="/dashboard/checkEmailReputation"
                                     className="block w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-3 px-4 rounded-lg text-center font-medium transition-colors"
                                 >
                                     Check Email Reputation

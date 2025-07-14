@@ -135,13 +135,13 @@ const Dashboard: React.FC = () => {
                     {/* Quick Actions */}
                     <div className="flex flex-wrap gap-4 mb-8">
                         <Link
-                            href="/warmup"
+                            href="/dashboard/warmup"
                             className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 font-semibold"
                         >
                             Manage Email Warmups
                         </Link>
                         <Link
-                            href="/checkEmailReputation"
+                            href="/dashboard/checkEmailReputation"
                             className="bg-gray-600 text-white py-3 px-6 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-semibold"
                         >
                             Check Email Reputation
@@ -162,7 +162,7 @@ const Dashboard: React.FC = () => {
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">No email warmups yet</h3>
                                 <p className="text-gray-500 mb-6">Get started by adding your first email for warming</p>
                                 <Link
-                                    href="/warmup"
+                                    href="/dashboard/warmup"
                                     className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                                 >
                                     Add Your First Email
@@ -221,7 +221,7 @@ const Dashboard: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <Link
-                                                    href="/warmup"
+                                                    href="/dashboard/warmup"
                                                     className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                                                 >
                                                     Manage →
