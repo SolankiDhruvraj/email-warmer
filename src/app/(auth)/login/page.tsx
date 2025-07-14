@@ -21,7 +21,7 @@ export default function LoginPage() {
         try {
             const response = await axios.post('/api/users/login', user);
             console.log('Login successful:', response.data);
-            router.push('/warmup');
+            router.push('/dashboard/warmup');
         } catch (error: any) {
             console.error('Login error:', error);
             setError(error.response?.data?.message || 'Login failed. Please try again.');
