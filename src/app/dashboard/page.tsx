@@ -177,8 +177,8 @@ const Dashboard: React.FC = () => {
                                                 <h3 className="text-lg font-semibold text-gray-900 truncate">{warmup.email}</h3>
                                                 <div className="flex items-center mt-1">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${warmup.isActive
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : 'bg-gray-100 text-gray-800'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-gray-100 text-gray-800'
                                                         }`}>
                                                         {warmup.isActive ? 'Active' : 'Inactive'}
                                                     </span>
