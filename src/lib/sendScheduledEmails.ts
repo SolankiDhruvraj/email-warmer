@@ -13,17 +13,20 @@ const sendScheduledEmails = async (email: string, appPass: string) => {
     throw new Error("Email and app password are required");
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedAppPass = appPass.replace(/\s+/g, "");
+
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
+  if (!emailRegex.test(normalizedEmail)) {
     throw new Error("Please provide a valid email address");
   }
 
   const mailTransporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-      user: email,
-      pass: appPass,
+      user: normalizedEmail,
+      pass: normalizedAppPass,
     },
   });
 
@@ -31,13 +34,13 @@ const sendScheduledEmails = async (email: string, appPass: string) => {
     // Connect to database
     await connect();
 
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      user = new User({ email, emails: [] });
+      user = new User({ email: normalizedEmail, emails: [] });
       await user.save();
     }
 
-    const allusers = await User.find({ email: { $ne: email } });
+    const allusers = await User.find({ email: { $ne: normalizedEmail } });
     allusers.forEach(async (existingUser) => {
       if (existingUser && !user.emails.includes(existingUser.email)) {
         user.emails.push(existingUser.email);
@@ -58,7 +61,7 @@ const sendScheduledEmails = async (email: string, appPass: string) => {
             return;
           }
 
-          const allUsers = await User.find({ email: { $ne: email } });
+          const allUsers = await User.find({ email: { $ne: normalizedEmail } });
           if (allUsers.length === 0) {
             console.log("No other users found for email sending");
             return;
@@ -79,15 +82,15 @@ const sendScheduledEmails = async (email: string, appPass: string) => {
 
           // Check if sender's email is not already present in the recipient's 'emails' array
           if (
-            !recipientUser.emails.includes(email) &&
-            email !== recipientUser.email
+            !recipientUser.emails.includes(normalizedEmail) &&
+            normalizedEmail !== recipientUser.email
           ) {
-            recipientUser.emails.push(email);
+            recipientUser.emails.push(normalizedEmail);
             await recipientUser.save();
           }
 
           const mailDetails: SendMailOptions = {
-            from: email,
+            from: normalizedEmail,
             to: recipientUser.email,
             subject: subject,
             text: emailContentWithoutSubject,

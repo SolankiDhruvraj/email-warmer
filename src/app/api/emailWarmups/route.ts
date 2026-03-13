@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import connect from "../../../lib/dbConfig";
 import EmailWarmup from "../../../model/emailWarmupModel";
+import checkEmailPassComb from "../../../lib/checkEmailPassComb";
+import { stopWarmupScheduler } from "../../../lib/emailWarmupScheduler";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 
@@ -66,17 +68,30 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { email, appPassword, dailyMailCount, dailyMailIncrease, maxDailyMailCount, warmupSchedule, reputationHistory } = body;
+        const {
+            email,
+            appPassword,
+            dailyMailCount,
+            dailyMailIncrease,
+            maxDailyMailCount,
+            warmupSchedule,
+            reputationHistory,
+            canReceiveWarmups,
+        } = body;
+        const normalizedEmail = email?.trim().toLowerCase();
+        const normalizedAppPassword = appPassword?.replace(/\s+/g, "");
 
-        if (!email || !appPassword) {
+        if (!normalizedEmail || !normalizedAppPassword) {
             return NextResponse.json(
                 { message: "Email and app password are required" },
                 { status: 400 }
             );
         }
 
+        await checkEmailPassComb(normalizedEmail, normalizedAppPassword);
+
         // Check if email already exists for this user
-        const existingWarmup = await EmailWarmup.findOne({ userId, email });
+        const existingWarmup = await EmailWarmup.findOne({ userId, email: normalizedEmail });
         if (existingWarmup) {
             return NextResponse.json(
                 { message: "Email already exists for this user" },
@@ -87,11 +102,12 @@ export async function POST(request: NextRequest) {
         // Create new email warmup
         const newWarmup = new EmailWarmup({
             userId,
-            email,
-            appPassword,
+            email: normalizedEmail,
+            appPassword: normalizedAppPassword,
             dailyMailCount: dailyMailCount || 3,
             dailyMailIncrease: dailyMailIncrease || 2,
             maxDailyMailCount: maxDailyMailCount || 5,
+            canReceiveWarmups: canReceiveWarmups ?? true,
             warmupSchedule: warmupSchedule || {
                 startTime: "10:00",
                 endTime: "17:00",
@@ -112,6 +128,14 @@ export async function POST(request: NextRequest) {
         });
     } catch (error) {
         console.error("Add email warmup error:", error);
+
+        if (error instanceof Error) {
+            return NextResponse.json(
+                { message: error.message },
+                { status: 400 }
+            );
+        }
+
         return NextResponse.json(
             { message: "Error adding email warmup" },
             { status: 500 }
@@ -133,7 +157,20 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { warmupId, email, appPassword, isActive, dailyMailCount, dailyMailIncrease, maxDailyMailCount, warmupSchedule, reputationHistory } = body;
+        const {
+            warmupId,
+            email,
+            appPassword,
+            isActive,
+            dailyMailCount,
+            dailyMailIncrease,
+            maxDailyMailCount,
+            warmupSchedule,
+            reputationHistory,
+            canReceiveWarmups,
+        } = body;
+        const normalizedEmail = email?.trim().toLowerCase();
+        const normalizedAppPassword = appPassword?.replace(/\s+/g, "");
 
         if (!warmupId) {
             return NextResponse.json(
@@ -151,11 +188,28 @@ export async function PUT(request: NextRequest) {
             );
         }
 
+        const nextEmail = normalizedEmail ?? warmup.email;
+        const nextAppPassword = normalizedAppPassword ?? warmup.appPassword;
+
+        if (email !== undefined || appPassword !== undefined) {
+            await checkEmailPassComb(nextEmail, nextAppPassword);
+        }
+
         // Update fields
         const updateData: any = {};
-        if (email !== undefined) updateData.email = email;
-        if (appPassword !== undefined) updateData.appPassword = appPassword;
-        if (isActive !== undefined) updateData.isActive = isActive;
+        if (normalizedEmail !== undefined) updateData.email = normalizedEmail;
+        if (normalizedAppPassword !== undefined) updateData.appPassword = normalizedAppPassword;
+        if (isActive !== undefined) {
+            updateData.isActive = isActive;
+
+            if (!isActive) {
+                stopWarmupScheduler(warmupId);
+                updateData.nextWarmupTime = null;
+            }
+        }
+        if (canReceiveWarmups !== undefined) {
+            updateData.canReceiveWarmups = canReceiveWarmups;
+        }
         if (dailyMailCount !== undefined) updateData.dailyMailCount = dailyMailCount;
         if (dailyMailIncrease !== undefined) updateData.dailyMailIncrease = dailyMailIncrease;
         if (maxDailyMailCount !== undefined) updateData.maxDailyMailCount = maxDailyMailCount;
@@ -175,6 +229,14 @@ export async function PUT(request: NextRequest) {
         });
     } catch (error) {
         console.error("Update email warmup error:", error);
+
+        if (error instanceof Error) {
+            return NextResponse.json(
+                { message: error.message },
+                { status: 400 }
+            );
+        }
+
         return NextResponse.json(
             { message: "Error updating email warmup" },
             { status: 500 }
@@ -214,6 +276,8 @@ export async function DELETE(request: NextRequest) {
                 { status: 404 }
             );
         }
+
+        stopWarmupScheduler(warmupId);
 
         return NextResponse.json({
             success: true,

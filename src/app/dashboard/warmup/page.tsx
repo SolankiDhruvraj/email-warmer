@@ -8,11 +8,13 @@ interface EmailWarmup {
     _id: string;
     email: string;
     isActive: boolean;
+    canReceiveWarmups: boolean;
     emailsSent: number;
     emailsReceived: number;
     dailyMailCount: number;
     dailyMailIncrease: number;
     maxDailyMailCount: number;
+    lastRecipientEmail?: string | null;
     lastWarmupDate: string | null;
     nextWarmupTime: string | null;
     warmupSchedule: {
@@ -41,6 +43,7 @@ const Warmup: React.FC = () => {
     const [newStartTime, setNewStartTime] = useState('10:00');
     const [newEndTime, setNewEndTime] = useState('17:00');
     const [newDaysOfWeek, setNewDaysOfWeek] = useState([1, 2, 3, 4, 5]);
+    const [newCanReceiveWarmups, setNewCanReceiveWarmups] = useState(true);
 
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -74,6 +77,7 @@ const Warmup: React.FC = () => {
                 dailyMailCount: newDailyMailCount,
                 dailyMailIncrease: newDailyMailIncrease,
                 maxDailyMailCount: newMaxDailyMailCount,
+                canReceiveWarmups: newCanReceiveWarmups,
                 warmupSchedule: {
                     startTime: newStartTime,
                     endTime: newEndTime,
@@ -134,6 +138,22 @@ const Warmup: React.FC = () => {
         }
     };
 
+    const handleTogglePoolRecipient = async (warmupId: string, canReceiveWarmups: boolean) => {
+        try {
+            const response = await axios.put('/api/emailWarmups', {
+                warmupId,
+                canReceiveWarmups: !canReceiveWarmups
+            });
+            if (response.data.success) {
+                setSuccess('Warmup pool membership updated successfully');
+                fetchEmailWarmups();
+            }
+        } catch (error: any) {
+            console.error('Toggle pool recipient error:', error);
+            setError(error.response?.data?.message || 'Failed to update warmup pool membership');
+        }
+    };
+
     const handleDeleteWarmup = async (warmupId: string) => {
         if (!confirm('Are you sure you want to delete this email warmup?')) {
             return;
@@ -160,6 +180,7 @@ const Warmup: React.FC = () => {
         setNewStartTime('10:00');
         setNewEndTime('17:00');
         setNewDaysOfWeek([1, 2, 3, 4, 5]);
+        setNewCanReceiveWarmups(true);
     };
 
     const toggleDay = (day: number) => {
@@ -331,13 +352,13 @@ const Warmup: React.FC = () => {
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Days of Week
                                                 </label>
-                                                <div className="flex space-x-2">
+                                                <div className="flex flex-wrap gap-2">
                                                     {[0, 1, 2, 3, 4, 5, 6].map(day => (
                                                         <button
                                                             key={day}
                                                             type="button"
                                                             onClick={() => toggleDay(day)}
-                                                            className={`px-3 py-2 rounded text-sm font-medium ${newDaysOfWeek.includes(day)
+                                                            className={`min-w-[3rem] px-3 py-2 rounded text-center text-sm font-medium ${newDaysOfWeek.includes(day)
                                                                 ? 'bg-blue-600 text-white'
                                                                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                                                 }`}
@@ -348,6 +369,16 @@ const Warmup: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <label className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                                            <input
+                                                type="checkbox"
+                                                checked={newCanReceiveWarmups}
+                                                onChange={(e) => setNewCanReceiveWarmups(e.target.checked)}
+                                                className="h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            Allow this inbox to receive warmup emails from the pool
+                                        </label>
 
                                         <button
                                             type="submit"
@@ -382,6 +413,9 @@ const Warmup: React.FC = () => {
                                                     <p className="text-sm text-gray-500">
                                                         Status: {warmup.isActive ? 'Active' : 'Inactive'}
                                                     </p>
+                                                    <p className="text-sm text-gray-500">
+                                                        Pool recipient: {warmup.canReceiveWarmups ? 'Enabled' : 'Disabled'}
+                                                    </p>
                                                 </div>
                                                 <div className="flex space-x-2">
                                                     <button
@@ -392,6 +426,15 @@ const Warmup: React.FC = () => {
                                                             }`}
                                                     >
                                                         {warmup.isActive ? 'Pause' : 'Activate'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleTogglePoolRecipient(warmup._id, warmup.canReceiveWarmups)}
+                                                        className={`px-3 py-1 rounded text-sm font-medium ${warmup.canReceiveWarmups
+                                                            ? 'bg-slate-700 text-white hover:bg-slate-800'
+                                                            : 'bg-sky-600 text-white hover:bg-sky-700'
+                                                            }`}
+                                                    >
+                                                        {warmup.canReceiveWarmups ? 'Disable Pool' : 'Enable Pool'}
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteWarmup(warmup._id)}
@@ -410,13 +453,21 @@ const Warmup: React.FC = () => {
                                                     <p className="text-sm text-gray-600">
                                                         Max Daily: <span className="font-semibold">{warmup.maxDailyMailCount}</span>
                                                     </p>
+                                                    {warmup.lastRecipientEmail && (
+                                                        <p className="text-sm text-gray-600">
+                                                            Last recipient: <span className="font-semibold">{warmup.lastRecipientEmail}</span>
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             <div className="flex justify-between items-center">
                                                 <div className="text-sm text-gray-500">
                                                     {warmup.lastWarmupDate && (
-                                                        <p>Last warmup: {new Date(warmup.lastWarmupDate).toLocaleDateString()}</p>
+                                                        <p>Last warmup: {new Date(warmup.lastWarmupDate).toLocaleString()}</p>
+                                                    )}
+                                                    {warmup.nextWarmupTime && (
+                                                        <p>Next warmup: {new Date(warmup.nextWarmupTime).toLocaleString()}</p>
                                                     )}
                                                 </div>
                                                 <button
@@ -447,11 +498,11 @@ const Warmup: React.FC = () => {
                                 <div className="bg-blue-50 p-4 rounded-lg">
                                     <h3 className="font-semibold text-blue-900 mb-2">How it works:</h3>
                                     <ul className="text-sm text-blue-800 space-y-1">
-                                        <li>• Add multiple emails to warm up</li>
-                                        <li>• Each email has its own schedule</li>
-                                        <li>• Emails are sent during business hours</li>
-                                        <li>• Automatic replies to incoming emails</li>
-                                        <li>• Gradual increase in daily email count</li>
+                                        <li>• Keep at least 3 active warmup inboxes for healthy rotation</li>
+                                        <li>• Only pool-enabled inboxes receive warmup emails</li>
+                                        <li>• Start Warmup sends immediately, then follows the hourly schedule</li>
+                                        <li>• The scheduler rotates recipients and avoids repeating the same pair too quickly</li>
+                                        <li>• Daily volume ramps up gradually within your configured limits</li>
                                     </ul>
                                 </div>
                             </div>

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import connect from "../../../lib/dbConfig";
 import EmailWarmup from "../../../model/emailWarmupModel";
+import {
+    startWarmupNow,
+    startWarmupScheduler,
+} from "../../../lib/emailWarmupScheduler";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 
@@ -59,21 +63,22 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Update the warmup to mark it as started
-        const now = new Date();
-        const nextWarmupTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+        const { scheduledMinute, nextWarmupTime } = await startWarmupScheduler(
+            warmupId
+        );
+        const immediateRun = await startWarmupNow(warmupId, scheduledMinute);
 
-        await EmailWarmup.findByIdAndUpdate(warmupId, {
-            lastWarmupDate: now,
-            nextWarmupTime: nextWarmupTime
-        });
+        const message = immediateRun.success
+            ? `Email warming started for ${warmup.email}. First warmup email sent to ${immediateRun.recipientEmail}.`
+            : `Email warming started for ${warmup.email}. Immediate warmup skipped: ${immediateRun.message}.`;
 
         return NextResponse.json({
             success: true,
-            message: `Email warming started for ${warmup.email}`,
+            message,
             data: {
                 email: warmup.email,
-                nextWarmupTime: nextWarmupTime
+                immediateRun,
+                nextWarmupTime: immediateRun.nextWarmupTime ?? nextWarmupTime
             }
         });
     } catch (error) {

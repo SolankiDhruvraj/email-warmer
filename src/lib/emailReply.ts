@@ -22,15 +22,18 @@ const getEmails = async (email: string, appPass: string): Promise<void> => {
         throw new Error("Email and app password are required");
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedAppPass = appPass.replace(/\s+/g, "");
+
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
         throw new Error("Please provide a valid email address");
     }
 
     const imapConfig: ImapConfig = {
-        user: email,
-        password: appPass,
+        user: normalizedEmail,
+        password: normalizedAppPass,
         host: "imap.gmail.com",
         port: 993,
         tls: true,
@@ -40,13 +43,13 @@ const getEmails = async (email: string, appPass: string): Promise<void> => {
     const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-            user: email,
-            pass: appPass,
+            user: normalizedEmail,
+            pass: normalizedAppPass,
         },
     });
 
     try {
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
             console.log("User not found in the database.");
             return;

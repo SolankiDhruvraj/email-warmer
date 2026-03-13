@@ -18,6 +18,10 @@ const emailWarmupSchema = new mongoose.Schema({
         type: Boolean,
         default: true,
     },
+    canReceiveWarmups: {
+        type: Boolean,
+        default: true,
+    },
     emailsSent: {
         type: Number,
         default: 0,
@@ -43,6 +47,34 @@ const emailWarmupSchema = new mongoose.Schema({
     maxDailyMailCount: {
         type: Number,
         default: 5,
+    },
+    dailyEmailsSent: {
+        type: Number,
+        default: 0,
+    },
+    currentEmailIndex: {
+        type: Number,
+        default: 0,
+    },
+    lastRecipientEmail: {
+        type: String,
+        default: null,
+    },
+    lastRecipientAt: {
+        type: Date,
+        default: null,
+    },
+    recentRecipientEmails: {
+        type: [String],
+        default: [],
+    },
+    lastSenderEmail: {
+        type: String,
+        default: null,
+    },
+    lastReceivedAt: {
+        type: Date,
+        default: null,
     },
     lastWarmupDate: {
         type: Date,

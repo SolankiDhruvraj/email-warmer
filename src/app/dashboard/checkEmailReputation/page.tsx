@@ -8,6 +8,9 @@ interface EmailReputationResult {
     score: number;
     result: string;
     valid: boolean;
+    source: 'provider' | 'heuristic';
+    provider: 'hunter' | 'abstract' | 'local';
+    warning?: string;
     details: {
         deliverability: string;
         isDisposable: boolean;
@@ -27,6 +30,12 @@ const CheckEmailReputation = () => {
     const [result, setResult] = useState<EmailReputationResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    const getProviderLabel = (provider: EmailReputationResult['provider']) => {
+        if (provider === 'hunter') return 'HUNTER';
+        if (provider === 'abstract') return 'ABSTRACT';
+        return 'LOCAL ESTIMATE';
+    };
 
     const handleCheckEmailReputation = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -124,6 +133,17 @@ const CheckEmailReputation = () => {
                                     <span className="font-semibold">{result.score}/100</span>
                                 </div>
                                 <div className="flex items-center justify-between">
+                                    <span className="font-medium">Provider:</span>
+                                    <span className={`px-2 py-1 rounded text-sm font-semibold ${result.provider === 'hunter'
+                                        ? 'bg-emerald-100 text-emerald-800'
+                                        : result.provider === 'abstract'
+                                            ? 'bg-sky-100 text-sky-800'
+                                            : 'bg-orange-100 text-orange-800'
+                                        }`}>
+                                        {getProviderLabel(result.provider)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
                                     <span className="font-medium">Deliverability:</span>
                                     <span className={`px-2 py-1 rounded text-sm font-semibold ${result.result === 'deliverable' ? 'bg-green-100 text-green-800' :
                                         result.result === 'risky' ? 'bg-yellow-100 text-yellow-800' :
@@ -132,6 +152,12 @@ const CheckEmailReputation = () => {
                                         {result.result.toUpperCase()}
                                     </span>
                                 </div>
+
+                                {result.warning && (
+                                    <div className="rounded border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                                        {result.warning}
+                                    </div>
+                                )}
 
                                 {result.details && (
                                     <div className="mt-4 pt-4 border-t border-green-200">
