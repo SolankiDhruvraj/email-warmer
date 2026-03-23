@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { encrypt, decrypt } from "../lib/encryption";
 
 const emailWarmupSchema = new mongoose.Schema({
     userId: {
@@ -13,6 +14,8 @@ const emailWarmupSchema = new mongoose.Schema({
     appPassword: {
         type: String,
         required: true,
+        set: encrypt,
+        get: decrypt,
     },
     isActive: {
         type: Boolean,
@@ -98,21 +101,10 @@ const emailWarmupSchema = new mongoose.Schema({
             default: [1, 2, 3, 4, 5], // Monday to Friday
         },
     },
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-    updatedAt: {
-        type: Date,
-        default: Date.now,
-    },
-});
+}, { timestamps: true });
 
-// Update the updatedAt field before saving
-emailWarmupSchema.pre('save', function (next) {
-    this.updatedAt = new Date();
-    next();
-});
+// Enforce one warmup tracking record per email account per user
+emailWarmupSchema.index({ userId: 1, email: 1 }, { unique: true });
 
 const EmailWarmup = mongoose.models.EmailWarmup || mongoose.model("EmailWarmup", emailWarmupSchema);
 

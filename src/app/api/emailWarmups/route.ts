@@ -2,29 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import connect from "../../../lib/dbConfig";
 import EmailWarmup from "../../../model/emailWarmupModel";
 import checkEmailPassComb from "../../../lib/checkEmailPassComb";
-import { stopWarmupScheduler } from "../../../lib/emailWarmupScheduler";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
+import { stopWarmupScheduler, startWarmupScheduler } from "../../../lib/emailWarmupScheduler";
+import { getUserIdFromToken } from "../../../lib/auth";
+import { z } from "zod";
 
-// Helper function to get user ID from token
-const getUserIdFromToken = async (request: NextRequest) => {
-    try {
-        const cookieStore = await cookies();
-        const token = cookieStore.get("token")?.value;
+const warmupScheduleSchema = z.object({
+  startTime: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time format"),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid time format"),
+  daysOfWeek: z.array(z.number().min(0).max(6)).min(1),
+}).optional();
 
-        if (!token) {
-            console.log("No token found in cookies");
-            return null;
-        }
+const postWarmupSchema = z.object({
+  email: z.string().email().trim().toLowerCase(),
+  appPassword: z.string().trim().min(1),
+  dailyMailCount: z.number().positive().optional(),
+  dailyMailIncrease: z.number().positive().optional(),
+  maxDailyMailCount: z.number().positive().optional(),
+  warmupSchedule: warmupScheduleSchema,
+  canReceiveWarmups: z.boolean().optional(),
+  reputationHistory: z.array(z.any()).optional()
+});
 
-        const decoded = jwt.verify(token, process.env.TOKEN_SECRET || "fallback-secret") as any;
-        console.log("Token decoded:", decoded);
-        return decoded.id;
-    } catch (error) {
-        console.error("Token verification error:", error);
-        return null;
-    }
-};
+const putWarmupSchema = z.object({
+  warmupId: z.string().min(1),
+  email: z.string().email().trim().toLowerCase().optional(),
+  appPassword: z.string().trim().min(1).optional(),
+  isActive: z.boolean().optional(),
+  dailyMailCount: z.number().positive().optional(),
+  dailyMailIncrease: z.number().positive().optional(),
+  maxDailyMailCount: z.number().positive().optional(),
+  warmupSchedule: warmupScheduleSchema,
+  canReceiveWarmups: z.boolean().optional(),
+  reputationHistory: z.array(z.any()).optional()
+});
 
 // GET - Get all email warmups for the user
 export async function GET(request: NextRequest) {
@@ -68,25 +78,27 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
+        const parsedBody = postWarmupSchema.safeParse(body);
+        
+        if (!parsedBody.success) {
+            return NextResponse.json(
+                { message: "Invalid input", errors: parsedBody.error.flatten() },
+                { status: 400 }
+            );
+        }
+
         const {
-            email,
-            appPassword,
+            email: normalizedEmail,
+            appPassword: rawAppPassword,
             dailyMailCount,
             dailyMailIncrease,
             maxDailyMailCount,
             warmupSchedule,
             reputationHistory,
             canReceiveWarmups,
-        } = body;
-        const normalizedEmail = email?.trim().toLowerCase();
-        const normalizedAppPassword = appPassword?.replace(/\s+/g, "");
-
-        if (!normalizedEmail || !normalizedAppPassword) {
-            return NextResponse.json(
-                { message: "Email and app password are required" },
-                { status: 400 }
-            );
-        }
+        } = parsedBody.data;
+        
+        const normalizedAppPassword = rawAppPassword.replace(/\s+/g, "");
 
         await checkEmailPassComb(normalizedEmail, normalizedAppPassword);
 
@@ -157,10 +169,19 @@ export async function PUT(request: NextRequest) {
         }
 
         const body = await request.json();
+        const parsedBody = putWarmupSchema.safeParse(body);
+        
+        if (!parsedBody.success) {
+            return NextResponse.json(
+                { message: "Invalid input", errors: parsedBody.error.flatten() },
+                { status: 400 }
+            );
+        }
+
         const {
             warmupId,
-            email,
-            appPassword,
+            email: normalizedEmail,
+            appPassword: rawAppPassword,
             isActive,
             dailyMailCount,
             dailyMailIncrease,
@@ -168,16 +189,9 @@ export async function PUT(request: NextRequest) {
             warmupSchedule,
             reputationHistory,
             canReceiveWarmups,
-        } = body;
-        const normalizedEmail = email?.trim().toLowerCase();
-        const normalizedAppPassword = appPassword?.replace(/\s+/g, "");
-
-        if (!warmupId) {
-            return NextResponse.json(
-                { message: "Warmup ID is required" },
-                { status: 400 }
-            );
-        }
+        } = parsedBody.data;
+        
+        const normalizedAppPassword = rawAppPassword ? rawAppPassword.replace(/\s+/g, "") : undefined;
 
         // Find the warmup and ensure it belongs to the user
         const warmup = await EmailWarmup.findOne({ _id: warmupId, userId });
@@ -191,7 +205,17 @@ export async function PUT(request: NextRequest) {
         const nextEmail = normalizedEmail ?? warmup.email;
         const nextAppPassword = normalizedAppPassword ?? warmup.appPassword;
 
-        if (email !== undefined || appPassword !== undefined) {
+        if (normalizedEmail !== undefined && normalizedEmail !== warmup.email) {
+            const duplicateCheck = await EmailWarmup.findOne({ userId, email: normalizedEmail });
+            if (duplicateCheck) {
+                return NextResponse.json(
+                    { message: "Email already exists for this user" },
+                    { status: 400 }
+                );
+            }
+        }
+
+        if (normalizedEmail !== undefined || normalizedAppPassword !== undefined) {
             await checkEmailPassComb(nextEmail, nextAppPassword);
         }
 
@@ -205,6 +229,12 @@ export async function PUT(request: NextRequest) {
             if (!isActive) {
                 stopWarmupScheduler(warmupId);
                 updateData.nextWarmupTime = null;
+            } else {
+                try {
+                    await startWarmupScheduler(warmupId);
+                } catch (e) {
+                    console.error("Failed to re-start scheduler:", e);
+                }
             }
         }
         if (canReceiveWarmups !== undefined) {
