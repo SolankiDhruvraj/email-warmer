@@ -12,7 +12,7 @@ export function middleware(request: NextRequest) {
 
   // If user is on a public path and has a token, redirect to dashboard
   if (isPublicPath && token) {
-    return NextResponse.redirect(new URL("/warmup", request.nextUrl));
+    return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
   }
 
   // If user is on a protected path and doesn't have a token, redirect to login
