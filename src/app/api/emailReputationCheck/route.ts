@@ -300,7 +300,7 @@ const tryHunterLookup = async (
     const data = await response.json();
 
     if (!response.ok) {
-        throw new Error(`Hunter API error: ${data.errors?.[0]?.details || data.message || "Unknown error"}`);
+        throw new Error(`Hunter API error: ${data.errors?.[0]?.details || data.message || JSON.stringify(data) || "Unknown error"}`);
     }
 
     const payload = data.data || {};
@@ -347,7 +347,8 @@ const tryAbstractLookup = async (
     const data = await response.json();
 
     if (!response.ok) {
-        throw new Error(`Abstract API error: ${data.message || "Unknown error"}`);
+        const errorMsg = data?.error?.message || data?.message || JSON.stringify(data) || "Unknown error";
+        throw new Error(`Abstract API error: ${errorMsg}`);
     }
 
     return scoreProviderResult({
