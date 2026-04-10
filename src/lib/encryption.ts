@@ -15,7 +15,7 @@ export function encrypt(text: string): string {
     try {
         const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
         const iv = crypto.randomBytes(INITIALIZATION_VECTOR_LENGTH);
-        const cipher = crypto.createCipheriv('aes-256-cbc', key as any, iv);
+        const cipher = crypto.createCipheriv('aes-256-cbc', key as any, iv as any);
         let encrypted = cipher.update(text, 'utf8', 'hex');
         encrypted += cipher.final('hex');
         return iv.toString('hex') + ':' + encrypted;
@@ -39,7 +39,7 @@ export function decrypt(text: string): string {
         const iv = Buffer.from(ivHex, 'hex');
         
         const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-        const decipher = crypto.createDecipheriv('aes-256-cbc', key as any, iv);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', key as any, iv as any);
         let decrypted = decipher.update(encryptedTextHex, 'hex', 'utf8');
         decrypted += decipher.final('utf8');
         
